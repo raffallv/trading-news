@@ -459,6 +459,12 @@ def run_monitor():
         time.sleep(MONITOR_INTERVAL_SEC)
 
 
+def test_telegram_connectivity():
+    start = time.time()
+    ok = send_telegram("🔧 Connectivity test from GitHub Actions runner (" + current_et().strftime("%Y-%m-%d %H:%M:%S ET") + ")")
+    log.info("Telegram connectivity test: %s (%.1fs)", "OK" if ok else "FAILED", time.time() - start)
+
+
 # ---------------- ENTRY ----------------
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "brief"
@@ -468,5 +474,7 @@ if __name__ == "__main__":
         scan_once()
     elif mode == "finviz":
         scan_finviz()
+    elif mode == "test-telegram":
+        test_telegram_connectivity()
     else:
         run_brief()
