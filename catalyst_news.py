@@ -472,6 +472,33 @@ def format_avg_vol(value):
         return str(value)
 
 
+def format_raw_count(value):
+    # Volume comes as a bare share count (e.g. "3393445") — scale to K/M/B.
+    try:
+        n = float(str(value).replace(",", ""))
+    except (TypeError, ValueError):
+        return str(value)
+    if n >= 1_000_000_000:
+        return "%.2fB" % (n / 1_000_000_000)
+    if n >= 1_000_000:
+        return "%.2fM" % (n / 1_000_000)
+    if n >= 1_000:
+        return "%.2fK" % (n / 1_000)
+    return "%.0f" % n
+
+
+def format_millions(value):
+    # Float and Market Cap come pre-expressed in millions (e.g. "336.78" =
+    # $336.78M) — bump to B above 1000 and add the missing suffix.
+    try:
+        n = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    if n >= 1000:
+        return "%.2fB" % (n / 1000)
+    return "%.2fM" % n
+
+
 def render_dashboard_html(rows, generated_at):
     cells = []
     for r in rows:
@@ -480,10 +507,10 @@ def render_dashboard_html(rows, generated_at):
             "<td>" + html.escape(str(r.get("price", "n/a"))) + "</td>"
             "<td>" + html.escape(str(r.get("change", "n/a"))) + "</td>"
             "<td>" + html.escape(str(r.get("rel_volume", "n/a"))) + "</td>"
-            "<td>" + html.escape(str(r.get("volume", "n/a"))) + "</td>"
+            "<td>" + html.escape(format_raw_count(r.get("volume", "n/a"))) + "</td>"
             "<td>" + html.escape(format_avg_vol(r.get("avg_volume", "n/a"))) + "</td>"
-            "<td>" + html.escape(str(r.get("float", "n/a"))) + "</td>"
-            "<td>" + html.escape(str(r.get("market_cap", "n/a"))) + "</td></tr>"
+            "<td>" + html.escape(format_millions(r.get("float", "n/a"))) + "</td>"
+            "<td>" + html.escape(format_millions(r.get("market_cap", "n/a"))) + "</td></tr>"
         )
     rows_html = "\n".join(cells) if cells else "<tr><td colspan='8'>No matches right now.</td></tr>"
     return """<!doctype html>
