@@ -99,18 +99,22 @@ def send_telegram(msg):
     chunks = [msg[i:i + 4000] for i in range(0, len(msg), 4000)]
     ok = True
     for chunk in chunks:
-        try:
-            r = requests.post(url, json={
-                "chat_id": TELEGRAM_CHAT_ID,
-                "text": chunk,
-                "parse_mode": "HTML",
-                "disable_web_page_preview": True,
-            }, timeout=15)
-            if r.status_code != 200:
+        chunk_sent = False
+        for attempt in range(1, 3):
+            try:
+                r = requests.post(url, json={
+                    "chat_id": TELEGRAM_CHAT_ID,
+                    "text": chunk,
+                    "parse_mode": "HTML",
+                    "disable_web_page_preview": True,
+                }, timeout=15)
+                if r.status_code == 200:
+                    chunk_sent = True
+                    break
                 log.error("Telegram error %s: %s", r.status_code, r.text[:200])
-                ok = False
-        except Exception as e:
-            log.error("Telegram send failed: %s", e)
+            except Exception as e:
+                log.error("Telegram send failed (attempt %d/2): %s", attempt, e)
+        if not chunk_sent:
             ok = False
     return ok
 
@@ -420,16 +424,15 @@ def scan_finviz():
     today_key = current_et().strftime("%Y-%m-%d")
     try:
         rows = get_finviz_screener()
-        alerts = []
-        for row in rows:
+        sent = 0
+        for row in rows[:10]:
             ticker = row.get("ticker")
             if not ticker:
                 continue
             key = ticker + "|" + today_key
             if key in seen:
                 continue
-            seen.add(key)
-            alerts.append(
+            msg = (
                 "🎯 <b>MOMENTUM SCREEN</b> — RVOL>3x, float 1M-30M, day perf >5%\n"
                 "$" + ticker + " | $" + str(row.get("price", "n/a"))
                 + " (" + str(row.get("change", "n/a")) + ")\n"
@@ -439,9 +442,12 @@ def scan_finviz():
                 "Float: " + str(row.get("float", "n/a"))
                 + " · Mkt Cap: " + str(row.get("market_cap", "n/a"))
             )
-        for a in alerts[:10]:
-            send_telegram(a)
-        log.info("Finviz screen done: %d matches, %d new alerts", len(rows), len(alerts))
+            # Only mark as seen once the alert actually sends — a failed/timed-out
+            # send must not permanently suppress that ticker for the trading day.
+            if send_telegram(msg):
+                seen.add(key)
+                sent += 1
+        log.info("Finviz screen done: %d matches, %d new alerts", len(rows), sent)
         save_seen(seen, FINVIZ_SEEN_FILE)
     except Exception as e:
         log.error("Finviz scan error: %s", e)
