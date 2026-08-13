@@ -27,7 +27,7 @@ FINNHUB_API_KEY    = os.environ.get("FINNHUB_API_KEY", "")
 
 MONITOR_INTERVAL_SEC = 600
 MONITOR_START_HOUR_ET = 4
-MONITOR_END_HOUR_ET   = 20
+MONITOR_END_HOUR_ET   = 16
 MIN_BREAKING_SCORE    = 8
 SEEN_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "seen_news.json")
 
