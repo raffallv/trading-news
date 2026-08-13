@@ -36,11 +36,19 @@ MONITOR_END_HOUR_ET   = 16
 MIN_BREAKING_SCORE    = 8
 SEEN_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "seen_news.json")
 FINVIZ_SEEN_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "seen_finviz.json")
+DASHBOARD_SEEN_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "seen_dashboard.json")
+DASHBOARD_HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs", "dashboard.html")
 
 # Momentum screen — mirrors the "Momentum scanner" preset saved in Finviz Elite:
 # $20M-$10B cap, AMEX/NASDAQ/NYSE only, $1-$20 price, RVOL>3x,
 # avg vol>300K, current vol>300K, float 1M-30M, day performance >5%
 FINVIZ_FILTER = "cap_0.02to10,exch_amex|nasd|nyse,sh_avgvol_o300,sh_curvol_o300,sh_float_1to30x,sh_price_1to20,sh_relvol_o3,ta_perf_d5o"
+
+# Dashboard screen: $10M-$10B cap, $1-$20 price, RVOL>3x, avg vol>300K,
+# float 1M-20M, day change >=15%. (cap_0.01to10 = $10M-$10B in Finviz's
+# billions-denominated custom cap filter — cap_10to10000 as typed would
+# mean >$10B, the same unit bug found and fixed in FINVIZ_FILTER above.)
+DASHBOARD_FILTER = "cap_0.01to10,sh_price_o1,sh_price_u20,sh_relvol_o3,sh_avgvol_o300,sh_float_o1,sh_float_u20,ta_change_u15"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("catalyst")
@@ -377,7 +385,7 @@ FINVIZ_FIELD_ALIASES = {
 }
 
 
-def get_finviz_screener():
+def get_finviz_screener(filter_str=None):
     if not FINVIZ_AUTH_TOKEN:
         log.error("FINVIZ_AUTH_TOKEN missing — skipping Finviz screen")
         return []
@@ -386,7 +394,7 @@ def get_finviz_screener():
     try:
         r = requests.get(url, params={
             "v": "152",
-            "f": FINVIZ_FILTER,
+            "f": filter_str or FINVIZ_FILTER,
             "c": cols,
             "auth": FINVIZ_AUTH_TOKEN,
         }, headers=UA, timeout=20)
@@ -453,6 +461,81 @@ def scan_finviz():
         log.error("Finviz scan error: %s", e)
 
 
+# ---------------- LIVE DASHBOARD ----------------
+def render_dashboard_html(rows, generated_at):
+    cells = []
+    for r in rows:
+        cells.append(
+            "<tr><td>$" + html.escape(str(r.get("ticker", "n/a"))) + "</td>"
+            "<td>" + html.escape(str(r.get("price", "n/a"))) + "</td>"
+            "<td>" + html.escape(str(r.get("change", "n/a"))) + "</td>"
+            "<td>" + html.escape(str(r.get("rel_volume", "n/a"))) + "</td>"
+            "<td>" + html.escape(str(r.get("volume", "n/a"))) + "</td>"
+            "<td>" + html.escape(str(r.get("avg_volume", "n/a"))) + "</td>"
+            "<td>" + html.escape(str(r.get("float", "n/a"))) + "</td>"
+            "<td>" + html.escape(str(r.get("market_cap", "n/a"))) + "</td></tr>"
+        )
+    rows_html = "\n".join(cells) if cells else "<tr><td colspan='8'>No matches right now.</td></tr>"
+    return """<!doctype html>
+<html><head><meta charset="utf-8">
+<meta http-equiv="refresh" content="300">
+<title>Momentum Dashboard</title>
+<style>
+body{font-family:-apple-system,Arial,sans-serif;background:#0b0e14;color:#e6e6e6;padding:24px}
+table{border-collapse:collapse;width:100%;max-width:900px}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid #2a2f3a}
+th{color:#9aa4b2;font-weight:600}
+tr:hover{background:#151a24}
+.meta{color:#9aa4b2;margin-bottom:16px}
+</style></head>
+<body>
+<h1>Momentum Screener Dashboard</h1>
+<div class="meta">Filter: cap $10M-$10B · price $1-$20 · RVOL&gt;3x · avg vol&gt;300K · float 1M-20M · day change &ge;15%<br>
+Last updated: """ + html.escape(generated_at) + """ · refreshes every 5 minutes</div>
+<table>
+<tr><th>Ticker</th><th>Price</th><th>Change</th><th>RVOL</th><th>Volume</th><th>Avg Vol</th><th>Float</th><th>Mkt Cap</th></tr>
+""" + rows_html + """
+</table>
+</body></html>
+"""
+
+
+def run_dashboard():
+    seen = load_seen(DASHBOARD_SEEN_FILE)
+    today_key = current_et().strftime("%Y-%m-%d")
+    rows = get_finviz_screener(DASHBOARD_FILTER)
+
+    os.makedirs(os.path.dirname(DASHBOARD_HTML_PATH), exist_ok=True)
+    generated_at = current_et().strftime("%a %b %d, %Y %I:%M:%S %p ET")
+    with open(DASHBOARD_HTML_PATH, "w") as f:
+        f.write(render_dashboard_html(rows, generated_at))
+    log.info("Dashboard written: %d rows", len(rows))
+
+    sent = 0
+    for row in rows[:10]:
+        ticker = row.get("ticker")
+        if not ticker:
+            continue
+        key = ticker + "|" + today_key
+        if key in seen:
+            continue
+        msg = (
+            "📊 <b>DASHBOARD MATCH</b> — cap $10M-$10B, RVOL>3x, float 1M-20M, change>=15%\n"
+            "$" + ticker + " | $" + str(row.get("price", "n/a"))
+            + " (" + str(row.get("change", "n/a")) + ")\n"
+            "RVOL: " + str(row.get("rel_volume", "n/a"))
+            + " · Vol: " + str(row.get("volume", "n/a"))
+            + " · Avg Vol: " + str(row.get("avg_volume", "n/a")) + "\n"
+            "Float: " + str(row.get("float", "n/a"))
+            + " · Mkt Cap: " + str(row.get("market_cap", "n/a"))
+        )
+        if send_telegram(msg):
+            seen.add(key)
+            sent += 1
+    log.info("Dashboard scan done: %d matches, %d new alerts", len(rows), sent)
+    save_seen(seen, DASHBOARD_SEEN_FILE)
+
+
 def run_monitor():
     while True:
         scan_once()
@@ -474,6 +557,8 @@ if __name__ == "__main__":
         scan_once()
     elif mode == "finviz":
         scan_finviz()
+    elif mode == "dashboard":
+        run_dashboard()
     elif mode == "test-telegram":
         test_telegram_connectivity()
     else:
