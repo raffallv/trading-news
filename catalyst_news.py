@@ -37,9 +37,10 @@ MIN_BREAKING_SCORE    = 8
 SEEN_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "seen_news.json")
 FINVIZ_SEEN_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "seen_finviz.json")
 
-# Momentum screen: $10M-$10B cap, $1-$20 price, RVOL>=3x, avg vol>=300K,
-# float 1M-20M shares, day change >=15%
-FINVIZ_FILTER = "cap_10to10000,sh_price_o1,sh_price_u20,sh_relvol_o3,sh_avgvol_o300,sh_float_o1,sh_float_u20,ta_change_u15"
+# Momentum screen — mirrors the "Momentum scanner" preset saved in Finviz Elite:
+# $20M-$10B cap, AMEX/NASDAQ/NYSE only, $1-$20 price, RVOL>3x,
+# avg vol>300K, current vol>300K, float 1M-30M, day performance >5%
+FINVIZ_FILTER = "cap_0.02to10,exch_amex|nasd|nyse,sh_avgvol_o300,sh_curvol_o300,sh_float_1to30x,sh_price_1to20,sh_relvol_o3,ta_perf_d5o"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("catalyst")
@@ -427,7 +428,7 @@ def scan_finviz():
                 continue
             seen.add(key)
             alerts.append(
-                "🎯 <b>MOMENTUM SCREEN</b> — RVOL≥3x, float 1M-20M, +15%+\n"
+                "🎯 <b>MOMENTUM SCREEN</b> — RVOL>3x, float 1M-30M, day perf >5%\n"
                 "$" + ticker + " | $" + str(row.get("price", "n/a"))
                 + " (" + str(row.get("change", "n/a")) + ")\n"
                 "RVOL: " + str(row.get("rel_volume", "n/a"))
