@@ -1,8 +1,11 @@
 name: Finviz Momentum Screen
 
+# Disabled by request 2026-08-13 — Dashboard Match covers this now, kept
+# separate. Manual runs still work if this needs to come back; just
+# uncomment the schedule block below.
 on:
-  schedule:
-    - cron: "*/15 8-20 * * 1-5"
+  # schedule:
+  #   - cron: "*/15 8-20 * * 1-5"
   workflow_dispatch: {}
 
 permissions:
