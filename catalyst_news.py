@@ -302,6 +302,8 @@ def current_et():
 
 
 def in_trading_window():
+    if os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch":
+        return True  # manual runs are explicit intent — always execute
     t = current_et()
     return t.weekday() < 5 and MONITOR_START_HOUR_ET <= t.hour < MONITOR_END_HOUR_ET
 
