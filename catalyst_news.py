@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """
 Catalyst News Aggregator -> Telegram
-Sources: Stocktwits (trending), Yahoo Finance RSS, Finnhub (news + quotes)
+Sources: Stocktwits (trending), Yahoo Finance RSS, Finnhub (news + quotes),
+         Finviz Elite screener export (momentum scan)
 
 Modes:
-  python3 catalyst_news.py brief -> Top-10 catalyst brief
-  python3 catalyst_news.py scan  -> Single breaking-news scan (GitHub Actions)
+  python3 catalyst_news.py brief  -> Top-10 catalyst brief
+  python3 catalyst_news.py scan   -> Single breaking-news scan (GitHub Actions)
+  python3 catalyst_news.py finviz -> Single Finviz momentum screen (GitHub Actions)
 """
 
 import os
 import re
+import csv
 import sys
 import json
 import time
@@ -17,6 +20,7 @@ import html
 import logging
 import requests
 import xml.etree.ElementTree as ET
+from io import StringIO
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 
@@ -24,12 +28,18 @@ from collections import defaultdict
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID   = os.environ.get("TELEGRAM_CHAT_ID", "")
 FINNHUB_API_KEY    = os.environ.get("FINNHUB_API_KEY", "")
+FINVIZ_AUTH_TOKEN  = os.environ.get("FINVIZ_AUTH_TOKEN", "")
 
 MONITOR_INTERVAL_SEC = 600
 MONITOR_START_HOUR_ET = 4
 MONITOR_END_HOUR_ET   = 16
 MIN_BREAKING_SCORE    = 8
 SEEN_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "seen_news.json")
+FINVIZ_SEEN_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "seen_finviz.json")
+
+# Momentum screen: $10M-$10B cap, $1-$20 price, RVOL>=3x, avg vol>=300K,
+# float 1M-20M shares, day change >=15%
+FINVIZ_FILTER = "cap_10to10000,sh_price_o1,sh_price_u20,sh_relvol_o3,sh_avgvol_o300,sh_float_o1,sh_float_u20,ta_change_u15"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("catalyst")
@@ -286,27 +296,33 @@ def run_brief():
 
 
 # ---------------- SCAN MODE ----------------
-def load_seen():
+def current_et():
+    return datetime.now(timezone(timedelta(hours=-4)))
+
+
+def in_trading_window():
+    t = current_et()
+    return t.weekday() < 5 and MONITOR_START_HOUR_ET <= t.hour < MONITOR_END_HOUR_ET
+
+
+def load_seen(path=SEEN_FILE):
     try:
-        with open(SEEN_FILE) as f:
+        with open(path) as f:
             return set(json.load(f))
     except Exception:
         return set()
 
 
-def save_seen(seen):
+def save_seen(seen, path=SEEN_FILE):
     try:
-        with open(SEEN_FILE, "w") as f:
+        with open(path, "w") as f:
             json.dump(list(seen)[-2000:], f)
     except Exception as e:
-        log.warning("Could not save seen file: %s", e)
+        log.warning("Could not save seen file (%s): %s", path, e)
 
 
 def scan_once():
-    now_et = datetime.now(timezone(timedelta(hours=-4)))
-    in_window = (now_et.weekday() < 5
-                 and MONITOR_START_HOUR_ET <= now_et.hour < MONITOR_END_HOUR_ET)
-    if not in_window:
+    if not in_trading_window():
         log.info("Outside market window — skipping scan")
         return
 
@@ -338,6 +354,96 @@ def scan_once():
         log.error("Scan error: %s", e)
 
 
+# ---------------- FINVIZ MOMENTUM SCREEN ----------------
+# Column names we look for in the export header, in priority order per field.
+# Finviz's own header labels are used instead of hardcoded column IDs so a
+# wrong/renumbered column ID degrades to "n/a" instead of silently mislabeling data.
+FINVIZ_FIELD_ALIASES = {
+    "ticker": ["Ticker"],
+    "price": ["Price"],
+    "change": ["Change"],
+    "volume": ["Volume"],
+    "avg_volume": ["Avg Volume", "Average Volume"],
+    "rel_volume": ["Rel Volume", "Relative Volume"],
+    "float": ["Float", "Shs Float", "Shares Float"],
+    "market_cap": ["Market Cap"],
+}
+
+
+def get_finviz_screener():
+    if not FINVIZ_AUTH_TOKEN:
+        log.error("FINVIZ_AUTH_TOKEN missing — skipping Finviz screen")
+        return []
+    cols = ",".join(str(i) for i in range(71))
+    url = "https://elite.finviz.com/export.ashx"
+    try:
+        r = requests.get(url, params={
+            "v": "152",
+            "f": FINVIZ_FILTER,
+            "c": cols,
+            "auth": FINVIZ_AUTH_TOKEN,
+        }, headers=UA, timeout=20)
+        if r.status_code != 200:
+            log.error("Finviz export error %s: %s", r.status_code, r.text[:200])
+            return []
+        reader = csv.DictReader(StringIO(r.text))
+        if not reader.fieldnames:
+            log.error("Finviz export returned no columns")
+            return []
+        header_map = {}
+        for field, aliases in FINVIZ_FIELD_ALIASES.items():
+            for alias in aliases:
+                match = next((h for h in reader.fieldnames if h.strip().lower() == alias.lower()), None)
+                if match:
+                    header_map[field] = match
+                    break
+            else:
+                log.warning("Finviz export missing expected column: %s", field)
+        rows = []
+        for row in reader:
+            rows.append({field: row.get(col, "n/a") for field, col in header_map.items()})
+        return rows
+    except Exception as e:
+        log.error("Finviz screener fetch failed: %s", e)
+        return []
+
+
+def scan_finviz():
+    if not in_trading_window():
+        log.info("Outside market window — skipping Finviz screen")
+        return
+
+    seen = load_seen(FINVIZ_SEEN_FILE)
+    today_key = current_et().strftime("%Y-%m-%d")
+    try:
+        rows = get_finviz_screener()
+        alerts = []
+        for row in rows:
+            ticker = row.get("ticker")
+            if not ticker:
+                continue
+            key = ticker + "|" + today_key
+            if key in seen:
+                continue
+            seen.add(key)
+            alerts.append(
+                "🎯 <b>MOMENTUM SCREEN</b> — RVOL≥3x, float 1M-20M, +15%+\n"
+                "$" + ticker + " | $" + str(row.get("price", "n/a"))
+                + " (" + str(row.get("change", "n/a")) + ")\n"
+                "RVOL: " + str(row.get("rel_volume", "n/a"))
+                + " · Vol: " + str(row.get("volume", "n/a"))
+                + " · Avg Vol: " + str(row.get("avg_volume", "n/a")) + "\n"
+                "Float: " + str(row.get("float", "n/a"))
+                + " · Mkt Cap: " + str(row.get("market_cap", "n/a"))
+            )
+        for a in alerts[:10]:
+            send_telegram(a)
+        log.info("Finviz screen done: %d matches, %d new alerts", len(rows), len(alerts))
+        save_seen(seen, FINVIZ_SEEN_FILE)
+    except Exception as e:
+        log.error("Finviz scan error: %s", e)
+
+
 def run_monitor():
     while True:
         scan_once()
@@ -351,5 +457,7 @@ if __name__ == "__main__":
         run_monitor()
     elif mode == "scan":
         scan_once()
+    elif mode == "finviz":
+        scan_finviz()
     else:
         run_brief()
