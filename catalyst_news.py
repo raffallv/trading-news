@@ -462,6 +462,16 @@ def scan_finviz():
 
 
 # ---------------- LIVE DASHBOARD ----------------
+def format_avg_vol(value):
+    # Finviz's export gives this column pre-divided by 1,000 (matching the
+    # "524.52K" style shown on-site) but without the K suffix — add it back.
+    try:
+        float(value)
+        return str(value) + "K"
+    except (TypeError, ValueError):
+        return str(value)
+
+
 def render_dashboard_html(rows, generated_at):
     cells = []
     for r in rows:
@@ -471,7 +481,7 @@ def render_dashboard_html(rows, generated_at):
             "<td>" + html.escape(str(r.get("change", "n/a"))) + "</td>"
             "<td>" + html.escape(str(r.get("rel_volume", "n/a"))) + "</td>"
             "<td>" + html.escape(str(r.get("volume", "n/a"))) + "</td>"
-            "<td>" + html.escape(str(r.get("avg_volume", "n/a"))) + "</td>"
+            "<td>" + html.escape(format_avg_vol(r.get("avg_volume", "n/a"))) + "</td>"
             "<td>" + html.escape(str(r.get("float", "n/a"))) + "</td>"
             "<td>" + html.escape(str(r.get("market_cap", "n/a"))) + "</td></tr>"
         )
@@ -481,12 +491,14 @@ def render_dashboard_html(rows, generated_at):
 <meta http-equiv="refresh" content="300">
 <title>Momentum Dashboard</title>
 <style>
-body{font-family:-apple-system,Arial,sans-serif;background:#0b0e14;color:#e6e6e6;padding:24px}
-table{border-collapse:collapse;width:100%;max-width:900px}
-th,td{padding:8px 12px;text-align:left;border-bottom:1px solid #2a2f3a}
-th{color:#9aa4b2;font-weight:600}
-tr:hover{background:#151a24}
-.meta{color:#9aa4b2;margin-bottom:16px}
+body{font-family:-apple-system,Arial,sans-serif;background:#0a1628;color:#dfe8f5;padding:24px}
+h1{color:#f0f5fc}
+table{border-collapse:collapse;width:100%;max-width:960px}
+th,td{padding:10px 14px;text-align:left;border-bottom:1px solid #1e3252}
+th{background:#132b4d;color:#8fc1f0;font-weight:600;letter-spacing:.02em}
+td{background:#0d1f38}
+tr:hover td{background:#152c4d}
+.meta{color:#7a93b8;margin-bottom:16px}
 </style></head>
 <body>
 <h1>Momentum Screener Dashboard</h1>
