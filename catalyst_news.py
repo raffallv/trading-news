@@ -445,10 +445,10 @@ def scan_finviz():
                 "$" + ticker + " | $" + str(row.get("price", "n/a"))
                 + " (" + str(row.get("change", "n/a")) + ")\n"
                 "RVOL: " + str(row.get("rel_volume", "n/a"))
-                + " · Vol: " + str(row.get("volume", "n/a"))
-                + " · Avg Vol: " + str(row.get("avg_volume", "n/a")) + "\n"
-                "Float: " + str(row.get("float", "n/a"))
-                + " · Mkt Cap: " + str(row.get("market_cap", "n/a"))
+                + " · Vol: " + format_raw_count(row.get("volume", "n/a"))
+                + " · Avg Vol: " + format_avg_vol(row.get("avg_volume", "n/a")) + "\n"
+                "Float: " + format_millions(row.get("float", "n/a"))
+                + " · Mkt Cap: " + format_millions(row.get("market_cap", "n/a"))
             )
             # Only mark as seen once the alert actually sends — a failed/timed-out
             # send must not permanently suppress that ticker for the trading day.
@@ -563,10 +563,10 @@ def run_dashboard():
             "$" + ticker + " | $" + str(row.get("price", "n/a"))
             + " (" + str(row.get("change", "n/a")) + ")\n"
             "RVOL: " + str(row.get("rel_volume", "n/a"))
-            + " · Vol: " + str(row.get("volume", "n/a"))
-            + " · Avg Vol: " + str(row.get("avg_volume", "n/a")) + "\n"
-            "Float: " + str(row.get("float", "n/a"))
-            + " · Mkt Cap: " + str(row.get("market_cap", "n/a"))
+            + " · Vol: " + format_raw_count(row.get("volume", "n/a"))
+            + " · Avg Vol: " + format_avg_vol(row.get("avg_volume", "n/a")) + "\n"
+            "Float: " + format_millions(row.get("float", "n/a"))
+            + " · Mkt Cap: " + format_millions(row.get("market_cap", "n/a"))
         )
         if send_telegram(msg):
             seen.add(key)
