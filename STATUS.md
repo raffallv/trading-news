@@ -1,34 +1,31 @@
-# System status (as of 2026-08-13, ~5:40pm ET)
+# System status (as of 2026-08-13, ~6:35pm ET)
 
 There are two separate systems. They do not share code, credentials, or a
 session — keep them mentally (and operationally) apart.
 
-## 1. This repo (`raffallv/trading-news`) — Telegram alerts only
+## 1. This repo (`raffallv/trading-news`) — Telegram alerts + dashboard
 
-Scope from here on: **news/catalyst alerts to Telegram.** Nothing else gets
-touched in this repo without an explicit ask.
+Scope: **Telegram alerts and the GitHub Pages dashboard.** Nothing else
+gets touched in this repo without an explicit ask.
 
 - `catalyst_news.py brief` / `scan` — keyword-scored news catalysts (FDA,
   M&A, earnings, etc.) → Telegram. Runs via `.github/workflows/brief.yml`
-  and `monitor.yml`. This is the original, primary feature.
+  and `monitor.yml`. Original, primary feature. **Active.**
 - `catalyst_news.py finviz` — Finviz Elite "Momentum scanner" preset
-  (`FINVIZ_FILTER`, cap $20M-$10B / AMEX-NASDAQ-NYSE / RVOL>3x / float
-  1M-30M / day perf >5%) → Telegram. Runs via `finviz_scan.yml`.
+  (`FINVIZ_FILTER`) → Telegram. **Disabled by request** — its schedule in
+  `finviz_scan.yml` is commented out (Dashboard Match covers this need
+  now). `workflow_dispatch` still works for a manual run; uncomment the
+  cron block to bring the schedule back.
 - `catalyst_news.py dashboard` — Finviz screen (`DASHBOARD_FILTER`, cap
-  $2M-$10B / price $1-$20 / RVOL>3x / float 1M-30M / change>=15%) → writes
-  `docs/dashboard.html` + Telegram alerts. Runs via `dashboard.yml`.
-  **GitHub Pages is not yet enabled** — needs a one-time manual step
-  (Settings → Pages → Deploy from branch → main /docs) before the page is
-  reachable at `https://raffallv.github.io/trading-news/dashboard.html`.
+  $2M-$10B / price $1-$20 / RVOL>3x / avg vol>300K / float 1M-30M /
+  change>=15%) → writes `docs/dashboard.html` + Telegram alerts. Runs via
+  `dashboard.yml`, every 5 min during premarket/market hours. **Active.**
+  GitHub Pages is enabled (Settings → Pages → main /docs) and live at
+  `https://raffallv.github.io/trading-news/dashboard.html`.
 
-**Known issue:** Telegram sends have been failing consistently (15s read
-timeouts against `api.telegram.org`) since ~4:30pm ET today, across ~30+
-attempts from GitHub Actions. Likely self-inflicted flood-limiting from
-heavy live testing in a short window — not a code bug. `send_telegram()`
-already retries once and only marks a ticker "seen" after a confirmed
-send, so nothing gets silently lost once Telegram recovers; failed sends
-retry on the next scheduled run. Re-test with a single isolated send
-after a cooldown to confirm.
+**Telegram connectivity:** confirmed working (`test-telegram` returned
+OK, 0.6s) after an earlier self-inflicted flood-limit from heavy same-day
+testing cleared on its own. No open issue.
 
 ## 2. iMac local dashboard — NOT in this repo, NOT tracked here
 

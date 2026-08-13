@@ -12,7 +12,7 @@ Tailscale dashboard (different system, different session, not tracked here).
 |---|---|---|---|
 | `brief` | Top-10 catalyst digest from news | `brief.yml` | 5:30am ET weekdays + Sun 6pm ET |
 | `scan` | Keyword-scored breaking news (FDA, M&A, earnings, etc.) | `monitor.yml` | every 15 min, 4am-4pm ET, Mon-Fri |
-| `finviz` | "Momentum scanner" Finviz preset (`FINVIZ_FILTER`) | `finviz_scan.yml` | every 15 min, 4am-4pm ET, Mon-Fri |
+| `finviz` | "Momentum scanner" Finviz preset (`FINVIZ_FILTER`) | `finviz_scan.yml` | **disabled** (schedule commented out by request — Dashboard Match covers this) |
 | `dashboard` | Finviz screen (`DASHBOARD_FILTER`) → `docs/dashboard.html` + Telegram | `dashboard.yml` | every 5 min, 4am-4pm ET, Mon-Fri |
 | `test-telegram` | Single connectivity ping, logs OK/FAILED + latency | `test_telegram.yml` | manual only |
 | `test-alerts` | 2 clearly-fake alerts in real format, no Finviz call, no seen-cache writes | `test_fake_alerts.yml` | manual only |
