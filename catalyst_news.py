@@ -587,6 +587,30 @@ def test_telegram_connectivity():
     log.info("Telegram connectivity test: %s (%.1fs)", "OK" if ok else "FAILED", time.time() - start)
 
 
+def test_fake_alerts():
+    # Fake data only — no Finviz call, no seen-cache writes. Pure format preview.
+    fake_rows = [
+        {"ticker": "TESTA", "price": "4.20", "change": "+32.5%", "rel_volume": "5.1",
+         "volume": "2450000", "avg_volume": "480.00", "float": "8.50", "market_cap": "42.00"},
+        {"ticker": "TESTB", "price": "12.75", "change": "+18.9%", "rel_volume": "3.8",
+         "volume": "1875000", "avg_volume": "620.00", "float": "15.20", "market_cap": "310.50"},
+    ]
+    sent = 0
+    for row in fake_rows:
+        msg = (
+            "🧪 <b>TEST ALERT — fake data, not a real signal</b>\n"
+            "$" + row["ticker"] + " | $" + row["price"] + " (" + row["change"] + ")\n"
+            "RVOL: " + row["rel_volume"]
+            + " · Vol: " + format_raw_count(row["volume"])
+            + " · Avg Vol: " + format_avg_vol(row["avg_volume"]) + "\n"
+            "Float: " + format_millions(row["float"])
+            + " · Mkt Cap: " + format_millions(row["market_cap"])
+        )
+        if send_telegram(msg):
+            sent += 1
+    log.info("Fake alert test done: %d/%d sent", sent, len(fake_rows))
+
+
 # ---------------- ENTRY ----------------
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "brief"
@@ -600,5 +624,7 @@ if __name__ == "__main__":
         run_dashboard()
     elif mode == "test-telegram":
         test_telegram_connectivity()
+    elif mode == "test-alerts":
+        test_fake_alerts()
     else:
         run_brief()
