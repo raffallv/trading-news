@@ -45,10 +45,10 @@ DASHBOARD_HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "
 FINVIZ_FILTER = "cap_0.02to10,exch_amex|nasd|nyse,sh_avgvol_o300,sh_curvol_o300,sh_float_1to30x,sh_price_1to20,sh_relvol_o3,ta_perf_d5o"
 
 # Dashboard screen: $2M-$10B cap, $1-$20 price, RVOL>3x, avg vol>300K,
-# float 1M-20M, day change >=15%. (cap_0.002to10 = $2M-$10B in Finviz's
+# float 1M-30M, day change >=15%. (cap_0.002to10 = $2M-$10B in Finviz's
 # billions-denominated custom cap filter — cap_10to10000 as typed would
 # mean >$10B, the same unit bug found and fixed in FINVIZ_FILTER above.)
-DASHBOARD_FILTER = "cap_0.002to10,sh_price_o1,sh_price_u20,sh_relvol_o3,sh_avgvol_o300,sh_float_o1,sh_float_u20,ta_change_u15"
+DASHBOARD_FILTER = "cap_0.002to10,sh_price_o1,sh_price_u20,sh_relvol_o3,sh_avgvol_o300,sh_float_o1,sh_float_u30,ta_change_u15"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("catalyst")
@@ -529,7 +529,7 @@ tr:hover td{background:#152c4d}
 </style></head>
 <body>
 <h1>Momentum Screener Dashboard</h1>
-<div class="meta">Filter: cap $2M-$10B · price $1-$20 · RVOL&gt;3x · avg vol&gt;300K · float 1M-20M · day change &ge;15%<br>
+<div class="meta">Filter: cap $2M-$10B · price $1-$20 · RVOL&gt;3x · avg vol&gt;300K · float 1M-30M · day change &ge;15%<br>
 Last updated: """ + html.escape(generated_at) + """ · refreshes every 5 minutes</div>
 <table>
 <tr><th>Ticker</th><th>Price</th><th>Change</th><th>RVOL</th><th>Volume</th><th>Avg Vol</th><th>Float</th><th>Mkt Cap</th></tr>
@@ -559,7 +559,7 @@ def run_dashboard():
         if key in seen:
             continue
         msg = (
-            "📊 <b>DASHBOARD MATCH</b> — cap $2M-$10B, RVOL>3x, float 1M-20M, change>=15%\n"
+            "📊 <b>DASHBOARD MATCH</b> — cap $2M-$10B, RVOL>3x, float 1M-30M, change>=15%\n"
             "$" + ticker + " | $" + str(row.get("price", "n/a"))
             + " (" + str(row.get("change", "n/a")) + ")\n"
             "RVOL: " + str(row.get("rel_volume", "n/a"))

@@ -15,7 +15,7 @@ touched in this repo without an explicit ask.
   (`FINVIZ_FILTER`, cap $20M-$10B / AMEX-NASDAQ-NYSE / RVOL>3x / float
   1M-30M / day perf >5%) → Telegram. Runs via `finviz_scan.yml`.
 - `catalyst_news.py dashboard` — Finviz screen (`DASHBOARD_FILTER`, cap
-  $2M-$10B / price $1-$20 / RVOL>3x / float 1M-20M / change>=15%) → writes
+  $2M-$10B / price $1-$20 / RVOL>3x / float 1M-30M / change>=15%) → writes
   `docs/dashboard.html` + Telegram alerts. Runs via `dashboard.yml`.
   **GitHub Pages is not yet enabled** — needs a one-time manual step
   (Settings → Pages → Deploy from branch → main /docs) before the page is
