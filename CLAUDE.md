@@ -41,6 +41,33 @@ a new cap filter against that convention.
   **confirmed as expected behavior, not a bug** (user chose to keep both
   separate rather than merge/dedup them).
 
+## RVOL — do not confuse with Vol÷AvgVol
+
+The `RVOL` shown in alerts/dashboard (`row["rel_volume"]`, `catalyst_news.py`)
+is Finviz's own **Rel Volume** export column — pulled directly, never
+computed locally from the `Vol` / `Avg Vol` fields also shown alongside it.
+Those three are independent columns from the same Finviz row, not derived
+from each other.
+
+`Vol ÷ Avg Vol` (e.g. 2.45M / 2,376.28K ≈ 1.03x) answers "how does
+today's volume-so-far compare to a full normal day." RVOL answers a
+different question: "how does today's volume-so-far compare to what
+*usually trades by this same clock time* on a normal day" (time-of-day
+normalized). Early in the session that time-of-day baseline is a small
+sliver of the full-day average, so RVOL reads much higher than the naive
+Vol/AvgVol ratio — e.g. RVOL 20.62x alongside Vol/AvgVol≈1.03x is
+expected, not a bug or a data error. Don't "fix" RVOL to match
+Vol÷AvgVol if asked to investigate a discrepancy — recompute confirms the
+raw fields are fine; explain the time-of-day-normalization instead.
+
+Rough interpretation scale for this dashboard's tickers (low float
+1M-30M, so extra prone to whipsaw at high RVOL): <1x quiet · 1-2x mildly
+elevated · 2-3x worth a look · 3-5x real catalyst move (the filters'
+`sh_relvol_o3` cutoff) · 5-10x strong, still liquid enough to trade ·
+10x+ extreme, real but wide spreads/possible halts — treat as a spotlight
+on where attention is, not a standalone buy signal, and remember the same
+RVOL number is a bigger deal later in the day than right after the open.
+
 ## Reliability notes
 
 - `send_telegram()` retries once on failure/timeout.
